@@ -191,3 +191,6 @@ function frame(now) {
 requestAnimationFrame(frame);
 
 export { setupCanvas, render, drawEdge, drawActiveEdgePartial, spawnBurst, theme };
+
+console.log('boot ok');
+main
