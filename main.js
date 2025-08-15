@@ -101,3 +101,5 @@ console.log('dpr:', dpr);
 console.log('boot ok');
 
 export { setupCanvas, render, drawEdge, drawActiveEdgePartial, theme };
+console.log('boot ok');
+main
