@@ -14,6 +14,33 @@
 
   <div id="title" class="title hidden">
     <h1>One Line Draw</h1>
+    <label for="modeSelect" class="visually-hidden">Mode</label>
+    <select id="modeSelect">
+      <option value="classic">Classic</option>
+      <option value="timed">Timed</option>
+      <option value="moves">Moves</option>
+      <option value="zen">Zen</option>
+    </select>
+    <button id="startBtn"></button>
+    <a id="editorLink" href="editor.html">Editor</a>
+  </div>
+
+  <div id="game" class="game hidden">
+    <div class="hud">
+      <span id="hearts" aria-live="polite"></span>
+      <span id="meta" aria-live="polite"></span>
+      <button id="toggleMusic" aria-label="Toggle Music"></button>
+      <button id="toggleSfx" aria-label="Toggle SFX"></button>
+      <button id="toggleTheme" aria-label="Toggle Theme"></button>
+      <button id="hintBtn" aria-label="Hint"></button>
+    </div>
+    <svg id="board" tabindex="0"></svg>
+    <div id="modal" class="modal hidden" role="dialog" aria-modal="true">
+      <div class="modal-box">
+        <p id="modalText"></p>
+        <button id="modalBtn"></button>
+      </div>
+    </div>
     <button id="startBtn"></button>
   </div>
 

@@ -4,5 +4,11 @@
   "levelComplete": "Level Complete",
   "next": "Next",
   "gameOver": "Game Over",
+  "retry": "Retry",
+  "music": "Music",
+  "sfx": "SFX",
+  "editor": "Editor",
+  "hint": "Hint",
+  "theme": "Theme"
   "retry": "Retry"
 }

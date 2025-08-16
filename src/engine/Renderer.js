@@ -31,6 +31,9 @@ export default class Renderer {
       c.setAttribute("r", 20);
       c.setAttribute("data-index", i);
       c.setAttribute("class", "node");
+      c.setAttribute("tabindex", 0);
+      c.setAttribute("role", "button");
+      c.setAttribute("aria-label", `Node ${i}`);
       this.svg.appendChild(c);
     });
   }
@@ -51,6 +54,28 @@ export default class Renderer {
           x2 === pa.x * 1000 && y2 === pa.y * 1000)
       ) {
         line.classList.add("path");
+        line.classList.remove("hint");
+      }
+    });
+  }
+
+  highlightEdge(a, b) {
+    this.svg.querySelectorAll('.edge.hint').forEach(l => l.classList.remove('hint'));
+    const edges = this.svg.querySelectorAll('.edge');
+    const pa = this.graph.nodes[a];
+    const pb = this.graph.nodes[b];
+    edges.forEach((line) => {
+      const x1 = parseFloat(line.getAttribute("x1"));
+      const y1 = parseFloat(line.getAttribute("y1"));
+      const x2 = parseFloat(line.getAttribute("x2"));
+      const y2 = parseFloat(line.getAttribute("y2"));
+      if (
+        (x1 === pa.x * 1000 && y1 === pa.y * 1000 &&
+          x2 === pb.x * 1000 && y2 === pb.y * 1000) ||
+        (x1 === pb.x * 1000 && y1 === pb.y * 1000 &&
+          x2 === pa.x * 1000 && y2 === pa.y * 1000)
+      ) {
+        line.classList.add('hint');
       }
     });
   }
