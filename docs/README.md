@@ -9,6 +9,7 @@ Open `index.html` in a modern browser. No server is required.
 - `index.html` – shell, preloader and game container.
 - `styles.css` – basic theming.
 - `game.js` – boot code; loads modules from `src/`.
+codex/develop-studio-quality-one-line-draw-game
 - `src/engine/Audio.js` – simple Web Audio manager with music/SFX toggles.
 - `src/utils/Theme.js` – light/dark/high-contrast theme manager.
 - `src/core/Solver.js` – Hierholzer-based solver used for hints.
@@ -17,6 +18,7 @@ Open `index.html` in a modern browser. No server is required.
 - Keyboard-accessible SVG board and simple in-browser level editor.
 - Hint button shows next edge of Euler trail.
 - Music, SFX, and theme toggles in the HUD with persistence.
+main
 - `levels/levels.json` – sample level definitions.
 - `i18n/en.json` – strings.
 
@@ -34,4 +36,7 @@ Each level entry:
 `x` and `y` are normalised 0–1 coordinates.
 
 ## Notes
+codex/develop-studio-quality-one-line-draw-game
 This repository remains a minimal prototype and does not meet the full studio specification.
+This repository contains a small subset of the full specification. Audio, advanced game modes, the level editor and many polish items are not yet implemented.
+main
