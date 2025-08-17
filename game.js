@@ -3,6 +3,7 @@ import Solver from './src/core/Solver.js';
 import Renderer from './src/engine/Renderer.js';
 import AudioManager from './src/engine/Audio.js';
 import { initTheme, cycleTheme } from './src/utils/Theme.js';
+import { loadRating, saveRating, updateRating, getHintDelay } from './src/progress/Rating.js';
 import Renderer from './src/engine/Renderer.js';
 
 const i18n = await fetch('./i18n/en.json').then(r => r.json());
@@ -52,6 +53,12 @@ let mode = 'classic';
 let timer = 0;
 let moves = 0;
 let timerId;
+let hintTimerId;
+let graph, renderer;
+let solutionEdges = [];
+let currentNode = null;
+const visitedEdges = new Set();
+let rating = loadRating();
 let graph, renderer;
 let solutionEdges = [];
 const gameEl = document.getElementById('game');
@@ -87,6 +94,7 @@ function loadLevel(idx) {
   timer = 30;
   moves = data.edges.length * 2;
   clearInterval(timerId);
+  clearTimeout(hintTimerId);
   if (mode === 'timed') {
     timerId = setInterval(() => {
       timer--;
@@ -108,6 +116,12 @@ function loadLevel(idx) {
   renderer = new Renderer(board, graph);
   const solver = new Solver(graph);
   solutionEdges = solver.solve();
+  currentNode = null;
+  visitedEdges.clear();
+  hintBtn.disabled = true;
+  hintTimerId = setTimeout(() => {
+    hintBtn.disabled = false;
+  }, getHintDelay(rating));
   heartsEl.textContent = '❤'.repeat(hearts);
   graph = new Graph(data.nodes, data.edges);
   renderer = new Renderer(board, graph);
@@ -212,6 +226,8 @@ function handleHint() {
 function levelComplete() {
   clearInterval(timerId);
   audio.play('complete');
+  rating = updateRating(rating, true);
+  saveRating(rating);
   showModal(i18n.levelComplete, i18n.next, () => {
     levelIndex = (levelIndex + 1) % levels.length;
     loadLevel(levelIndex);
@@ -221,6 +237,8 @@ function levelComplete() {
 function gameOver() {
   clearInterval(timerId);
   audio.play('fail');
+  rating = updateRating(rating, false);
+  saveRating(rating);
   showModal(i18n.gameOver, i18n.retry, () => {
     levelIndex = 0;
     loadLevel(levelIndex);

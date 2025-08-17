@@ -90,6 +90,21 @@ body{
 .tools{width:200px;padding:10px;background:#222;display:flex;flex-direction:column;}
 .tools textarea{width:100%;margin-top:10px;}
 }
+#hintBtn.off{opacity:0.4;}
+#board{width:100%;height:100%;touch-action:none;}
+.edge{stroke:var(--edge);stroke-width:4;}
+.edge.path{stroke:#964B00;}
+.edge.hint{stroke:#0ff;stroke-dasharray:5 5;}
+.node{fill:var(--node);stroke:var(--node-stroke);stroke-width:2;cursor:pointer;}
+.node.active{fill:#ff0;}
+.modal{position:absolute;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;opacity:1;transition:opacity 0.12s;}
+.modal.hidden{opacity:0;pointer-events:none;}
+.modal-box{background:var(--bg);color:var(--fg);padding:20px;border-radius:8px;text-align:center;box-shadow:0 4px 10px rgba(0,0,0,0.5);}
+.editor{display:flex;height:100vh;}
+.editor svg{flex:1;border:1px solid #333;}
+.tools{width:200px;padding:10px;background:#222;display:flex;flex-direction:column;}
+.tools textarea{width:100%;margin-top:10px;}
+}
 .preloader .logo{
   font-size:32px;
   margin-bottom:20px;
