@@ -36,3 +36,6 @@ Each level entry:
 
 ## Notes
 This repository remains a minimal prototype and does not meet the full studio specification.
+codex/develop-studio-quality-one-line-draw-game
+This repository remains a minimal prototype and does not meet the full studio specification.
+This repository contains a small subset of the full specification. Audio, advanced game modes, the level editor and many polish items are not yet implemented.
