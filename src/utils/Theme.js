@@ -1,4 +1,4 @@
-const THEMES = ['dark','light','high'];
+const THEMES = ['dark','light','high','protan','deutan','tritan'];
 
 export function initTheme(){
   const saved = localStorage.getItem('theme');

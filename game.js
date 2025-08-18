@@ -4,7 +4,7 @@ import Renderer from './src/engine/Renderer.js';
 import AudioManager from './src/engine/Audio.js';
 import { initTheme, cycleTheme } from './src/utils/Theme.js';
 import { loadRating, saveRating, updateRating, getHintDelay } from './src/progress/Rating.js';
-import Renderer from './src/engine/Renderer.js';
+import { announce, showModal as trapShowModal, hideModal as trapHideModal } from './src/ui/UI.js';
 
 const i18n = await fetch('./i18n/en.json').then(r => r.json());
 const levels = await fetch('./levels/levels.json').then(r => r.json());
@@ -58,21 +58,13 @@ let graph, renderer;
 let solutionEdges = [];
 let currentNode = null;
 const visitedEdges = new Set();
+const edgeHistory = [];
+let nodeElems = [];
+let paused = false;
 let rating = loadRating();
-let graph, renderer;
-let solutionEdges = [];
-const gameEl = document.getElementById('game');
-const board = document.getElementById('board');
-const heartsEl = document.getElementById('hearts');
 
 startBtn.textContent = i18n.start;
 document.querySelector('#title h1').textContent = i18n.title;
-
-let levelIndex = 0;
-let hearts = 3;
-let graph, renderer;
-let currentNode = null;
-const visitedEdges = new Set();
 
 function showTitle() {
   preloader.classList.add('hidden');
@@ -118,28 +110,25 @@ function loadLevel(idx) {
   solutionEdges = solver.solve();
   currentNode = null;
   visitedEdges.clear();
+  edgeHistory.length = 0;
+  nodeElems = Array.from(board.querySelectorAll('.node'));
+  if (nodeElems[0]) nodeElems[0].focus();
   hintBtn.disabled = true;
   hintTimerId = setTimeout(() => {
     hintBtn.disabled = false;
   }, getHintDelay(rating));
-  heartsEl.textContent = '❤'.repeat(hearts);
-  graph = new Graph(data.nodes, data.edges);
-  renderer = new Renderer(board, graph);
-  currentNode = null;
-  visitedEdges.clear();
 }
 
 function showModal(text, btnText, cb) {
   modalText.textContent = text;
   modalBtn.textContent = btnText;
-  modal.classList.remove('hidden');
+  trapShowModal(modal);
   const handler = () => {
-    modal.classList.add('hidden');
+    trapHideModal(modal);
     modalBtn.removeEventListener('click', handler);
     cb();
   };
   modalBtn.addEventListener('click', handler, { once: true });
-  modalBtn.focus();
 }
 
 function handleNodeClick(e) {
@@ -160,12 +149,15 @@ function handleNodeClick(e) {
           hearts--;
           heartsEl.textContent = '❤'.repeat(hearts);
           audio.play('fail');
+          announce('Edge already used');
           if (hearts <= 0) return gameOver();
         }
       } else {
         visitedEdges.add(key);
+        edgeHistory.push({ a: currentNode, b: idx });
         renderer.markEdge(currentNode, idx);
         audio.play('connect');
+        announce(`Connected ${currentNode} to ${idx}`);
         currentNode = idx;
         if (mode === 'moves') {
           moves--;
@@ -179,6 +171,7 @@ function handleNodeClick(e) {
         hearts--;
         heartsEl.textContent = '❤'.repeat(hearts);
         audio.play('fail');
+        announce('Invalid move');
         if (hearts <= 0) return gameOver();
       }
       if (mode === 'moves') {
@@ -191,12 +184,58 @@ function handleNodeClick(e) {
 }
 
 function handleKey(e) {
-  if (e.target.classList.contains('node') && (e.key === 'Enter' || e.key === ' ')) {
-    handleNodeClick(e);
+  const key = e.key;
+  if (key === 'ArrowRight' || key === 'ArrowDown') {
+    moveFocus(1);
     e.preventDefault();
-  }
-  if (e.key.toLowerCase() === 'h') {
+  } else if (key === 'ArrowLeft' || key === 'ArrowUp') {
+    moveFocus(-1);
+    e.preventDefault();
+  } else if (key === 'Enter' || key === ' ') {
+    if (e.target.classList.contains('node')) handleNodeClick(e);
+    e.preventDefault();
+  } else if (key.toLowerCase() === 'u') {
+    undo();
+  } else if (key.toLowerCase() === 'p') {
+    togglePause();
+  } else if (key.toLowerCase() === 'h') {
     handleHint();
+  }
+}
+
+function moveFocus(dir) {
+  if (!nodeElems.length) return;
+  const current = nodeElems.indexOf(document.activeElement);
+  let next = current + dir;
+  if (next < 0) next = nodeElems.length - 1;
+  if (next >= nodeElems.length) next = 0;
+  nodeElems[next].focus();
+}
+
+function undo() {
+  const last = edgeHistory.pop();
+  if (!last) return;
+  const key = `${Math.min(last.a, last.b)}-${Math.max(last.a, last.b)}`;
+  visitedEdges.delete(key);
+  renderer.unmarkEdge(last.a, last.b);
+  currentNode = last.a;
+  announce('Undid move');
+}
+
+function togglePause() {
+  if (paused) {
+    trapHideModal(modal);
+    paused = false;
+  } else {
+    modalText.textContent = i18n.paused || 'Paused';
+    modalBtn.textContent = i18n.resume || 'Resume';
+    trapShowModal(modal);
+    modalBtn.onclick = () => {
+      trapHideModal(modal);
+      modalBtn.onclick = null;
+      paused = false;
+    };
+    paused = true;
   }
 }
 
@@ -206,19 +245,6 @@ function handleHint() {
     if (!visitedEdges.has(key)) {
       renderer.highlightEdge(a, b);
       return;
-        hearts--;
-        heartsEl.textContent = '❤'.repeat(hearts);
-        if (hearts <= 0) return gameOver();
-      } else {
-        visitedEdges.add(key);
-        renderer.markEdge(currentNode, idx);
-        currentNode = idx;
-        if (visitedEdges.size === graph.edges.length) return levelComplete();
-      }
-    } else {
-      hearts--;
-      heartsEl.textContent = '❤'.repeat(hearts);
-      if (hearts <= 0) return gameOver();
     }
   }
 }
@@ -260,18 +286,4 @@ hintBtn.addEventListener('click', handleHint);
 toggleThemeBtn.addEventListener('click', () => {
   currentTheme = cycleTheme(currentTheme);
 });
-  alert(i18n.levelComplete);
-  levelIndex = (levelIndex + 1) % levels.length;
-  loadLevel(levelIndex);
-}
-
-function gameOver() {
-  alert(i18n.gameOver);
-  levelIndex = 0;
-  loadLevel(levelIndex);
-}
-
-board.addEventListener('click', handleNodeClick);
-startBtn.addEventListener('click', startGame);
-
 setTimeout(showTitle, 700);
