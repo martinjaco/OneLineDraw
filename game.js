@@ -3,6 +3,8 @@ import Solver from './src/core/Solver.js';
 import Renderer from './src/engine/Renderer.js';
 import AudioManager from './src/engine/Audio.js';
 import { initTheme, cycleTheme } from './src/utils/Theme.js';
+import { updateRating, getHintDelay, recommendLevel } from './src/progress/Rating.js';
+import { loadProgress, saveProgress } from './src/progress/Storage.js';
 import { loadRating, saveRating, updateRating, getHintDelay } from './src/progress/Rating.js';
 import { announce, showModal as trapShowModal, hideModal as trapHideModal } from './src/ui/UI.js';
 
@@ -65,18 +67,31 @@ toggleSfxBtn.classList.toggle('off', !audio.enabled.sfx);
 modeSelect.value = Storage.getMode();
 let currentTheme = initTheme();
 
+const progress = loadProgress();
+let rating = progress.rating;
+let mode = progress.mode;
+modeSelect.value = mode;
+let levelIndex = recommendLevel(rating, levels.length);
+let hearts = progress.hearts;
+let timer = progress.timer;
 let levelIndex = Storage.getCurrentLevel();
 let hearts = 3;
 let initialHearts = 3;
 let mode = Storage.getMode();
 let timer = 0;
 let moves = 0;
+
 let timerId;
 let hintTimerId;
-let graph, renderer;
+let graph;
+let renderer;
 let solutionEdges = [];
 let currentNode = null;
 const visitedEdges = new Set();
+
+function saveState() {
+  saveProgress({ hearts, timer, mode, rating });
+}
 const edgeHistory = [];
 let nodeElems = [];
 let paused = false;
@@ -106,6 +121,7 @@ function startGame() {
   audio.init();
   audio.startMusic();
   mode = modeSelect.value;
+  saveState();
   Storage.setMode(mode);
   if (mode === 'daily') {
     const daily = getDailyChallenge();
@@ -124,12 +140,18 @@ function loadLevel(idx) {
   hearts = initialHearts;
   timer = 30;
   moves = data.edges.length * 2;
+  saveState();
+
   clearInterval(timerId);
   clearTimeout(hintTimerId);
+
+  if (mode === 'timed') {
+    metaEl.textContent = `⏱ ${timer}`;
   if (mode === 'timed' || mode === 'daily') {
     timerId = setInterval(() => {
       timer--;
       metaEl.textContent = `⏱ ${timer}`;
+      saveState();
       if (timer <= 0) gameOver();
     }, 1000);
     heartsEl.textContent = '❤'.repeat(hearts);
@@ -143,6 +165,7 @@ function loadLevel(idx) {
     heartsEl.textContent = '❤'.repeat(hearts);
     metaEl.textContent = '';
   }
+
   graph = new Graph(data.nodes, data.edges);
   renderer = new Renderer(board, graph);
   const solver = new Solver(graph);
@@ -180,6 +203,13 @@ function handleNodeClick(e) {
   const idx = parseInt(target.getAttribute('data-index'), 10);
   if (currentNode === null) {
     currentNode = idx;
+    target.classList.add('active');
+  } else if (currentNode === idx) {
+    target.classList.remove('active');
+    currentNode = null;
+  } else if (graph.edgeExists(currentNode, idx)) {
+    const key = `${Math.min(currentNode, idx)}-${Math.max(currentNode, idx)}`;
+    if (visitedEdges.has(key)) {
   } else {
     if (graph.edgeExists(currentNode, idx)) {
       const key = `${Math.min(currentNode, idx)}-${Math.max(currentNode, idx)}`;
@@ -209,15 +239,35 @@ function handleNodeClick(e) {
       if (mode !== 'zen') {
         hearts--;
         heartsEl.textContent = '❤'.repeat(hearts);
+        saveState();
         audio.play('fail');
         announce('Invalid move');
         if (hearts <= 0) return gameOver();
       }
+    } else {
+      visitedEdges.add(key);
+      renderer.markEdge(currentNode, idx);
+      audio.play('connect');
+      currentNode = idx;
       if (mode === 'moves') {
         moves--;
         metaEl.textContent = `📦 ${moves}`;
         if (moves <= 0) return gameOver();
       }
+      if (visitedEdges.size === graph.edges.length) return levelComplete();
+    }
+  } else {
+    if (mode !== 'zen') {
+      hearts--;
+      heartsEl.textContent = '❤'.repeat(hearts);
+      saveState();
+      audio.play('fail');
+      if (hearts <= 0) return gameOver();
+    }
+    if (mode === 'moves') {
+      moves--;
+      metaEl.textContent = `📦 ${moves}`;
+      if (moves <= 0) return gameOver();
     }
   }
 }
@@ -291,6 +341,12 @@ function handleHint() {
 function levelComplete() {
   clearInterval(timerId);
   audio.play('complete');
+  rating = updateRating(rating, true);
+  saveState();
+  showModal(i18n.levelComplete, i18n.next, () => {
+    levelIndex = (levelIndex + 1) % levels.length;
+    loadLevel(levelIndex);
+  });
   if (mode === 'daily') {
     Storage.updateDaily(dailyDate, {
       solved: true,
@@ -316,6 +372,9 @@ function levelComplete() {
 function gameOver() {
   clearInterval(timerId);
   audio.play('fail');
+  rating = updateRating(rating, false);
+  saveState();
+  showModal(i18n.gameOver, i18n.retry, () => {
   if (mode !== 'daily') {
     rating = updateRating(rating, false);
     saveRating(rating);
