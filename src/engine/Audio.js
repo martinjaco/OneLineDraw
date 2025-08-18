@@ -6,6 +6,7 @@ const FILES = {
   fail: 'assets/fail.wav',
   complete: 'assets/complete.wav',
 };
+import { getAudio, setAudio } from '../progress/Storage.ts';
 
 export default class AudioManager {
   constructor() {
@@ -21,6 +22,11 @@ export default class AudioManager {
     });
     this.enabled = saved.enabled;
     this.volume = saved.volume;
+    const saved = getAudio();
+    this.enabled = {
+      music: saved.music !== undefined ? saved.music : true,
+      sfx: saved.sfx !== undefined ? saved.sfx : true,
+    };
   }
 
   init() {
@@ -51,6 +57,7 @@ export default class AudioManager {
 
   save() {
     save('audio', { enabled: this.enabled, volume: this.volume });
+    setAudio(this.enabled);
   }
 
   toggle(type) {
