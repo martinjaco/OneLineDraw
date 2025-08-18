@@ -121,3 +121,5 @@ body{
 .edge.path{stroke:#964B00;}
 .node{fill:#fff;stroke:#000;stroke-width:2;cursor:pointer;}
 .node.active{fill:#ff0;}
+
+.hud input[type="range"]{width:80px;margin-left:10px;}
