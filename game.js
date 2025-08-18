@@ -4,7 +4,7 @@ import Renderer from './src/engine/Renderer.js';
 import AudioManager from './src/engine/Audio.js';
 import { initTheme, cycleTheme } from './src/utils/Theme.js';
 import { loadRating, saveRating, updateRating, getHintDelay } from './src/progress/Rating.js';
-import Renderer from './src/engine/Renderer.js';
+import Particles from './src/engine/Particles.js';
 
 const i18n = await fetch('./i18n/en.json').then(r => r.json());
 const levels = await fetch('./levels/levels.json').then(r => r.json());
@@ -27,6 +27,7 @@ const modalText = document.getElementById('modalText');
 const modalBtn = document.getElementById('modalBtn');
 
 const audio = new AudioManager();
+const particles = new Particles(gameEl);
 
 startBtn.textContent = i18n.start;
 document.querySelector('#title h1').textContent = i18n.title;
@@ -46,7 +47,6 @@ hintBtn.setAttribute('aria-label', i18n.hint);
 toggleMusicBtn.classList.toggle('off', !audio.enabled.music);
 toggleSfxBtn.classList.toggle('off', !audio.enabled.sfx);
 let currentTheme = initTheme();
-
 let levelIndex = 0;
 let hearts = 3;
 let mode = 'classic';
@@ -59,20 +59,50 @@ let solutionEdges = [];
 let currentNode = null;
 const visitedEdges = new Set();
 let rating = loadRating();
-let graph, renderer;
-let solutionEdges = [];
-const gameEl = document.getElementById('game');
-const board = document.getElementById('board');
-const heartsEl = document.getElementById('hearts');
+let lastClickTime = 0;
 
-startBtn.textContent = i18n.start;
-document.querySelector('#title h1').textContent = i18n.title;
+function vibrate(pattern) {
+  if (navigator.vibrate) navigator.vibrate(pattern);
+}
 
-let levelIndex = 0;
-let hearts = 3;
-let graph, renderer;
-let currentNode = null;
-const visitedEdges = new Set();
+function shake(intensity = 5, duration = 150) {
+  if (!board.animate) return;
+  const keyframes = [];
+  for (let i = 0; i < 10; i++) {
+    keyframes.push({
+      transform: `translate(${(Math.random() - 0.5) * intensity}px, ${(Math.random() - 0.5) * intensity}px)`
+    });
+  }
+  board.animate(keyframes, { duration, easing: 'ease-out' });
+}
+
+function pulse(type) {
+  switch (type) {
+    case 'success':
+      vibrate(20);
+      shake(3, 120);
+      break;
+    case 'fail':
+      vibrate([20, 60, 20]);
+      shake(5, 150);
+      break;
+    case 'heart':
+      vibrate(100);
+      shake(8, 200);
+      break;
+  }
+}
+
+function loseHeart() {
+  hearts--;
+  heartsEl.textContent = '❤'.repeat(hearts);
+  pulse('heart');
+  if (hearts <= 0) {
+    gameOver();
+    return true;
+  }
+  return false;
+}
 
 function showTitle() {
   preloader.classList.add('hidden');
@@ -122,11 +152,7 @@ function loadLevel(idx) {
   hintTimerId = setTimeout(() => {
     hintBtn.disabled = false;
   }, getHintDelay(rating));
-  heartsEl.textContent = '❤'.repeat(hearts);
-  graph = new Graph(data.nodes, data.edges);
-  renderer = new Renderer(board, graph);
-  currentNode = null;
-  visitedEdges.clear();
+  lastClickTime = 0;
 }
 
 function showModal(text, btnText, cb) {
@@ -156,16 +182,27 @@ function handleNodeClick(e) {
     if (graph.edgeExists(currentNode, idx)) {
       const key = `${Math.min(currentNode, idx)}-${Math.max(currentNode, idx)}`;
       if (visitedEdges.has(key)) {
-        if (mode !== 'zen') {
-          hearts--;
-          heartsEl.textContent = '❤'.repeat(hearts);
-          audio.play('fail');
-          if (hearts <= 0) return gameOver();
-        }
+        audio.play('fail');
+        pulse('fail');
+        const nodePos = graph.nodes[idx];
+        particles.errorSparks(nodePos.x * gameEl.clientWidth, nodePos.y * gameEl.clientHeight);
+        if (mode !== 'zen' && loseHeart()) return;
       } else {
+        const now = performance.now();
+        let velocity = 0;
+        if (lastClickTime) {
+          const prev = graph.nodes[currentNode];
+          const next = graph.nodes[idx];
+          const dist = Math.hypot(prev.x - next.x, prev.y - next.y);
+          velocity = dist / (now - lastClickTime);
+        }
+        lastClickTime = now;
         visitedEdges.add(key);
-        renderer.markEdge(currentNode, idx);
+        renderer.markEdge(currentNode, idx, velocity);
         audio.play('connect');
+        pulse('success');
+        const nodePos = graph.nodes[idx];
+        particles.connectBurst(nodePos.x * gameEl.clientWidth, nodePos.y * gameEl.clientHeight);
         currentNode = idx;
         if (mode === 'moves') {
           moves--;
@@ -175,12 +212,11 @@ function handleNodeClick(e) {
         if (visitedEdges.size === graph.edges.length) return levelComplete();
       }
     } else {
-      if (mode !== 'zen') {
-        hearts--;
-        heartsEl.textContent = '❤'.repeat(hearts);
-        audio.play('fail');
-        if (hearts <= 0) return gameOver();
-      }
+      audio.play('fail');
+      pulse('fail');
+      const nodePos = graph.nodes[idx];
+      particles.errorSparks(nodePos.x * gameEl.clientWidth, nodePos.y * gameEl.clientHeight);
+      if (mode !== 'zen' && loseHeart()) return;
       if (mode === 'moves') {
         moves--;
         metaEl.textContent = `📦 ${moves}`;
@@ -205,20 +241,7 @@ function handleHint() {
     const key = `${Math.min(a, b)}-${Math.max(a, b)}`;
     if (!visitedEdges.has(key)) {
       renderer.highlightEdge(a, b);
-      return;
-        hearts--;
-        heartsEl.textContent = '❤'.repeat(hearts);
-        if (hearts <= 0) return gameOver();
-      } else {
-        visitedEdges.add(key);
-        renderer.markEdge(currentNode, idx);
-        currentNode = idx;
-        if (visitedEdges.size === graph.edges.length) return levelComplete();
-      }
-    } else {
-      hearts--;
-      heartsEl.textContent = '❤'.repeat(hearts);
-      if (hearts <= 0) return gameOver();
+      break;
     }
   }
 }
@@ -226,6 +249,8 @@ function handleHint() {
 function levelComplete() {
   clearInterval(timerId);
   audio.play('complete');
+  pulse('success');
+  particles.solveConfetti();
   rating = updateRating(rating, true);
   saveRating(rating);
   showModal(i18n.levelComplete, i18n.next, () => {
@@ -237,6 +262,7 @@ function levelComplete() {
 function gameOver() {
   clearInterval(timerId);
   audio.play('fail');
+  pulse('fail');
   rating = updateRating(rating, false);
   saveRating(rating);
   showModal(i18n.gameOver, i18n.retry, () => {
@@ -260,18 +286,4 @@ hintBtn.addEventListener('click', handleHint);
 toggleThemeBtn.addEventListener('click', () => {
   currentTheme = cycleTheme(currentTheme);
 });
-  alert(i18n.levelComplete);
-  levelIndex = (levelIndex + 1) % levels.length;
-  loadLevel(levelIndex);
-}
-
-function gameOver() {
-  alert(i18n.gameOver);
-  levelIndex = 0;
-  loadLevel(levelIndex);
-}
-
-board.addEventListener('click', handleNodeClick);
-startBtn.addEventListener('click', startGame);
-
 setTimeout(showTitle, 700);
