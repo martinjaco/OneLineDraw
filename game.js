@@ -6,6 +6,7 @@ import { initTheme, cycleTheme } from './src/utils/Theme.js';
 import { updateRating, getHintDelay, recommendLevel } from './src/progress/Rating.js';
 import { loadProgress, saveProgress } from './src/progress/Storage.js';
 import { loadRating, saveRating, updateRating, getHintDelay } from './src/progress/Rating.js';
+import Particles from './src/engine/Particles.js';
 import { announce, showModal as trapShowModal, hideModal as trapHideModal } from './src/ui/UI.js';
 
 const i18n = await fetch('./i18n/en.json').then(r => r.json());
@@ -35,6 +36,7 @@ const modalText = document.getElementById('modalText');
 const modalBtn = document.getElementById('modalBtn');
 
 const audio = new AudioManager();
+const particles = new Particles(gameEl);
 
 startBtn.textContent = i18n.start;
 document.querySelector('#title h1').textContent = i18n.title;
@@ -66,6 +68,7 @@ toggleSfxBtn.classList.toggle('off', !audio.enabled.sfx);
 
 modeSelect.value = Storage.getMode();
 let currentTheme = initTheme();
+let levelIndex = 0;
 
 const progress = loadProgress();
 let rating = progress.rating;
@@ -96,6 +99,50 @@ const edgeHistory = [];
 let nodeElems = [];
 let paused = false;
 let rating = loadRating();
+let lastClickTime = 0;
+
+function vibrate(pattern) {
+  if (navigator.vibrate) navigator.vibrate(pattern);
+}
+
+function shake(intensity = 5, duration = 150) {
+  if (!board.animate) return;
+  const keyframes = [];
+  for (let i = 0; i < 10; i++) {
+    keyframes.push({
+      transform: `translate(${(Math.random() - 0.5) * intensity}px, ${(Math.random() - 0.5) * intensity}px)`
+    });
+  }
+  board.animate(keyframes, { duration, easing: 'ease-out' });
+}
+
+function pulse(type) {
+  switch (type) {
+    case 'success':
+      vibrate(20);
+      shake(3, 120);
+      break;
+    case 'fail':
+      vibrate([20, 60, 20]);
+      shake(5, 150);
+      break;
+    case 'heart':
+      vibrate(100);
+      shake(8, 200);
+      break;
+  }
+}
+
+function loseHeart() {
+  hearts--;
+  heartsEl.textContent = '❤'.repeat(hearts);
+  pulse('heart');
+  if (hearts <= 0) {
+    gameOver();
+    return true;
+  }
+  return false;
+}
 
 startBtn.textContent = i18n.start;
 document.querySelector('#title h1').textContent = i18n.title;
@@ -179,6 +226,7 @@ function loadLevel(idx) {
   hintTimerId = setTimeout(() => {
     hintBtn.disabled = false;
   }, getHintDelay(rating));
+  lastClickTime = 0;
   if (mode !== 'daily') Storage.setCurrentLevel(idx);
 }
 
@@ -214,6 +262,11 @@ function handleNodeClick(e) {
     if (graph.edgeExists(currentNode, idx)) {
       const key = `${Math.min(currentNode, idx)}-${Math.max(currentNode, idx)}`;
       if (visitedEdges.has(key)) {
+        audio.play('fail');
+        pulse('fail');
+        const nodePos = graph.nodes[idx];
+        particles.errorSparks(nodePos.x * gameEl.clientWidth, nodePos.y * gameEl.clientHeight);
+        if (mode !== 'zen' && loseHeart()) return;
         if (mode !== 'zen') {
           hearts--;
           heartsEl.textContent = '❤'.repeat(hearts);
@@ -222,7 +275,21 @@ function handleNodeClick(e) {
           if (hearts <= 0) return gameOver();
         }
       } else {
+        const now = performance.now();
+        let velocity = 0;
+        if (lastClickTime) {
+          const prev = graph.nodes[currentNode];
+          const next = graph.nodes[idx];
+          const dist = Math.hypot(prev.x - next.x, prev.y - next.y);
+          velocity = dist / (now - lastClickTime);
+        }
+        lastClickTime = now;
         visitedEdges.add(key);
+        renderer.markEdge(currentNode, idx, velocity);
+        audio.play('connect');
+        pulse('success');
+        const nodePos = graph.nodes[idx];
+        particles.connectBurst(nodePos.x * gameEl.clientWidth, nodePos.y * gameEl.clientHeight);
         edgeHistory.push({ a: currentNode, b: idx });
         renderer.markEdge(currentNode, idx);
         audio.play('connect');
@@ -236,6 +303,11 @@ function handleNodeClick(e) {
         if (visitedEdges.size === graph.edges.length) return levelComplete();
       }
     } else {
+      audio.play('fail');
+      pulse('fail');
+      const nodePos = graph.nodes[idx];
+      particles.errorSparks(nodePos.x * gameEl.clientWidth, nodePos.y * gameEl.clientHeight);
+      if (mode !== 'zen' && loseHeart()) return;
       if (mode !== 'zen') {
         hearts--;
         heartsEl.textContent = '❤'.repeat(hearts);
@@ -333,6 +405,7 @@ function handleHint() {
     const key = `${Math.min(a, b)}-${Math.max(a, b)}`;
     if (!visitedEdges.has(key)) {
       renderer.highlightEdge(a, b);
+      break;
       return;
     }
   }
@@ -341,6 +414,8 @@ function handleHint() {
 function levelComplete() {
   clearInterval(timerId);
   audio.play('complete');
+  pulse('success');
+  particles.solveConfetti();
   rating = updateRating(rating, true);
   saveState();
   showModal(i18n.levelComplete, i18n.next, () => {
@@ -372,6 +447,7 @@ function levelComplete() {
 function gameOver() {
   clearInterval(timerId);
   audio.play('fail');
+  pulse('fail');
   rating = updateRating(rating, false);
   saveState();
   showModal(i18n.gameOver, i18n.retry, () => {
