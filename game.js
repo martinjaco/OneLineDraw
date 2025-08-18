@@ -23,6 +23,8 @@ const toggleMusicBtn = document.getElementById('toggleMusic');
 const toggleSfxBtn = document.getElementById('toggleSfx');
 const toggleThemeBtn = document.getElementById('toggleTheme');
 const hintBtn = document.getElementById('hintBtn');
+const musicSlider = document.getElementById('musicSlider');
+const sfxSlider = document.getElementById('sfxSlider');
 const modal = document.getElementById('modal');
 const modalText = document.getElementById('modalText');
 const modalBtn = document.getElementById('modalBtn');
@@ -43,6 +45,16 @@ toggleSfxBtn.setAttribute('aria-label', i18n.sfx);
 toggleThemeBtn.setAttribute('aria-label', i18n.theme || 'Theme');
 hintBtn.textContent = i18n.hint;
 hintBtn.title = i18n.hint;
+ hintBtn.setAttribute('aria-label', i18n.hint);
+ musicSlider.value = audio.volume.music;
+ sfxSlider.value = audio.volume.sfx;
+function updateAudioButtons() {
+  toggleMusicBtn.textContent = audio.enabled.music ? '🎵' : '🔇';
+  toggleSfxBtn.textContent = audio.enabled.sfx ? '🔊' : '🔇';
+  toggleMusicBtn.classList.toggle('off', !audio.enabled.music);
+  toggleSfxBtn.classList.toggle('off', !audio.enabled.sfx);
+}
+updateAudioButtons();
 hintBtn.setAttribute('aria-label', i18n.hint);
 toggleMusicBtn.classList.toggle('off', !audio.enabled.music);
 toggleSfxBtn.classList.toggle('off', !audio.enabled.sfx);
@@ -139,9 +151,11 @@ function showModal(text, btnText, cb) {
   modalText.textContent = text;
   modalBtn.textContent = btnText;
   modal.classList.remove('hidden');
+  audio.duck(true);
   const handler = () => {
     modal.classList.add('hidden');
     modalBtn.removeEventListener('click', handler);
+    audio.duck(false);
     cb();
   };
   modalBtn.addEventListener('click', handler, { once: true });
@@ -258,12 +272,18 @@ modeSelect.addEventListener('change', () => {
   Storage.setMode(modeSelect.value);
 });
 toggleMusicBtn.addEventListener('click', () => {
-  const on = audio.toggle('music');
-  toggleMusicBtn.classList.toggle('off', !on);
+  audio.toggle('music');
+  updateAudioButtons();
 });
 toggleSfxBtn.addEventListener('click', () => {
-  const on = audio.toggle('sfx');
-  toggleSfxBtn.classList.toggle('off', !on);
+  audio.toggle('sfx');
+  updateAudioButtons();
+});
+musicSlider.addEventListener('input', e => {
+  audio.setVolume('music', parseFloat(e.target.value));
+});
+sfxSlider.addEventListener('input', e => {
+  audio.setVolume('sfx', parseFloat(e.target.value));
 });
 hintBtn.addEventListener('click', handleHint);
 toggleThemeBtn.addEventListener('click', () => {

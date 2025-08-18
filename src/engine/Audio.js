@@ -1,10 +1,27 @@
+import { load, save } from '../progress/Storage.ts';
+
+const FILES = {
+  music: 'assets/music.mp3',
+  connect: 'assets/connect.wav',
+  fail: 'assets/fail.wav',
+  complete: 'assets/complete.wav',
+};
 import { getAudio, setAudio } from '../progress/Storage.ts';
 
 export default class AudioManager {
   constructor() {
     this.ctx = null;
-    this.musicOsc = null;
+    this.buffers = {};
+    this.musicSource = null;
     this.musicGain = null;
+    this.sfxGain = null;
+    this.duckGain = null;
+    const saved = load('audio', {
+      enabled: { music: true, sfx: true },
+      volume: { music: 1, sfx: 1 },
+    });
+    this.enabled = saved.enabled;
+    this.volume = saved.volume;
     const saved = getAudio();
     this.enabled = {
       music: saved.music !== undefined ? saved.music : true,
@@ -13,68 +30,96 @@ export default class AudioManager {
   }
 
   init() {
-    if (!this.ctx) {
-      const AudioCtx = window.AudioContext || window.webkitAudioContext;
-      if (AudioCtx) {
-        this.ctx = new AudioCtx();
-      }
-    }
+    if (this.ctx) return;
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+    this.ctx = new AudioCtx();
+    this.musicGain = this.ctx.createGain();
+    this.sfxGain = this.ctx.createGain();
+    this.duckGain = this.ctx.createGain();
+    this.duckGain.gain.value = 1;
+    this.musicGain.connect(this.duckGain).connect(this.ctx.destination);
+    this.sfxGain.connect(this.ctx.destination);
+    this.setVolume('music', this.volume.music);
+    this.setVolume('sfx', this.volume.sfx);
+  }
+
+  async loadBuffer(name) {
+    if (this.buffers[name]) return this.buffers[name];
+    const file = FILES[name];
+    if (!file || !this.ctx) return null;
+    const res = await fetch(file);
+    const arr = await res.arrayBuffer();
+    const buf = await this.ctx.decodeAudioData(arr);
+    this.buffers[name] = buf;
+    return buf;
   }
 
   save() {
+    save('audio', { enabled: this.enabled, volume: this.volume });
     setAudio(this.enabled);
   }
 
   toggle(type) {
     this.enabled[type] = !this.enabled[type];
-    this.save();
+    this.setVolume(type, this.volume[type]);
     if (type === 'music') {
       if (this.enabled.music) this.startMusic();
       else this.stopMusic();
     }
+    this.save();
     return this.enabled[type];
   }
 
-  startMusic() {
-    if (!this.ctx || !this.enabled.music || this.musicOsc) return;
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
-    osc.frequency.value = 110; // mellow tone
-    gain.gain.value = 0.05;
-    osc.connect(gain).connect(this.ctx.destination);
-    osc.start();
-    this.musicOsc = osc;
-    this.musicGain = gain;
+  setVolume(type, val) {
+    this.volume[type] = val;
+    if (type === 'music' && this.musicGain) {
+      this.musicGain.gain.value = this.enabled.music ? val : 0;
+    } else if (type === 'sfx' && this.sfxGain) {
+      this.sfxGain.gain.value = this.enabled.sfx ? val : 0;
+    }
+    this.save();
+  }
+
+  duck(on) {
+    if (!this.duckGain || !this.ctx) return;
+    const target = on ? 0.3 : 1;
+    this.duckGain.gain.cancelScheduledValues(this.ctx.currentTime);
+    this.duckGain.gain.linearRampToValueAtTime(target, this.ctx.currentTime + 0.1);
+  }
+
+  async startMusic() {
+    if (!this.enabled.music) return;
+    this.init();
+    if (!this.ctx || this.musicSource) return;
+    await this.ctx.resume();
+    const buffer = await this.loadBuffer('music');
+    if (!buffer) return;
+    const src = this.ctx.createBufferSource();
+    src.buffer = buffer;
+    src.loop = true;
+    src.connect(this.musicGain);
+    src.start();
+    this.musicSource = src;
   }
 
   stopMusic() {
-    if (this.musicOsc) {
-      this.musicOsc.stop();
-      this.musicOsc.disconnect();
-      this.musicOsc = null;
+    if (this.musicSource) {
+      this.musicSource.stop();
+      this.musicSource.disconnect();
+      this.musicSource = null;
     }
   }
 
-  play(type) {
-    if (!this.ctx || !this.enabled.sfx) return;
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
-    let freq = 440;
-    switch (type) {
-      case 'fail':
-        freq = 220;
-        break;
-      case 'complete':
-        freq = 660;
-        break;
-      default:
-        freq = 440;
-    }
-    osc.frequency.value = freq;
-    osc.connect(gain).connect(this.ctx.destination);
-    gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.1);
-    osc.start();
-    osc.stop(this.ctx.currentTime + 0.1);
+  async play(type) {
+    if (!this.enabled.sfx) return;
+    this.init();
+    if (!this.ctx) return;
+    const buffer = await this.loadBuffer(type);
+    if (!buffer) return;
+    const src = this.ctx.createBufferSource();
+    src.buffer = buffer;
+    src.connect(this.sfxGain);
+    src.start();
   }
 }
