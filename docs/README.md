@@ -13,10 +13,10 @@ Open `index.html` in a modern browser. No server is required.
 - `src/utils/Theme.js` – light/dark/high-contrast theme manager.
 - `src/core/Solver.js` – Hierholzer-based solver used for hints.
 - Basic modal UI for level completion and game over.
-- Four modes: Classic, Timed (30s), Moves-limited, and Zen.
+- Five modes: Classic, Timed (30s), Moves-limited, Zen, and Daily challenge.
 - Keyboard-accessible SVG board and simple in-browser level editor.
 - Hint button shows next edge of Euler trail.
-- Music, SFX, and theme toggles in the HUD with persistence.
+- Music, SFX, theme, mode, locale, and progress persist via local storage.
 - Dynamic difficulty rating adjusts hint availability delay.
 - `levels/levels.json` – sample level definitions.
 - `i18n/en.json` – strings.
@@ -38,4 +38,5 @@ Each level entry:
 This repository remains a minimal prototype and does not meet the full studio specification.
 codex/develop-studio-quality-one-line-draw-game
 This repository remains a minimal prototype and does not meet the full studio specification.
-This repository contains a small subset of the full specification. Audio, advanced game modes, the level editor and many polish items are not yet implemented.
+This repository contains a small subset of the full specification. Audio, advanced game modes, the level editor and many polish
+items are not yet implemented.

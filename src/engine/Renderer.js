@@ -136,6 +136,24 @@ export default class Renderer {
     }
   }
 
+  unmarkEdge(a, b) {
+    const edges = this.svg.querySelectorAll('.edge');
+    const pa = this.graph.nodes[a];
+    const pb = this.graph.nodes[b];
+    edges.forEach(line => {
+      const x1 = parseFloat(line.getAttribute('x1'));
+      const y1 = parseFloat(line.getAttribute('y1'));
+      const x2 = parseFloat(line.getAttribute('x2'));
+      const y2 = parseFloat(line.getAttribute('y2'));
+      if (
+        (x1 === pa.x * 1000 && y1 === pa.y * 1000 && x2 === pb.x * 1000 && y2 === pb.y * 1000) ||
+        (x1 === pb.x * 1000 && y1 === pb.y * 1000 && x2 === pa.x * 1000 && y2 === pa.y * 1000)
+      ) {
+        line.classList.remove('path');
+      }
+    });
+  }
+
   highlightEdge(a, b) {
     if (!this.svg) return;
     this.svg

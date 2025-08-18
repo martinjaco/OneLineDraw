@@ -1,14 +1,11 @@
-const KEY = 'onelinedraw_rating';
-const storage = typeof localStorage !== 'undefined' ? localStorage : null;
+import { loadProgress, saveProgress } from './Storage.js';
 
 export function loadRating() {
-  if (!storage) return 1000;
-  const val = parseInt(storage.getItem(KEY), 10);
-  return Number.isFinite(val) ? val : 1000;
+  return loadProgress().rating;
 }
 
 export function saveRating(val) {
-  if (storage) storage.setItem(KEY, String(val));
+  saveProgress({ rating: val });
 }
 
 export function updateRating(current, win) {
@@ -21,4 +18,9 @@ export function updateRating(current, win) {
 export function getHintDelay(rating) {
   const delay = 10000 - (rating - 1000) * 5;
   return Math.max(3000, Math.min(15000, delay));
+}
+
+export function recommendLevel(rating, totalLevels) {
+  const idx = Math.floor((rating - 800) / 50);
+  return Math.max(0, Math.min(totalLevels - 1, idx));
 }
