@@ -16,12 +16,36 @@ html,body{height:100%;margin:0;}
   --node-stroke:#fff;
 }
 [data-theme='high']{
-  --bg:#000;
-  --fg:#fff;
-  --accent:#ff0;
-  --edge:#fff;
-  --node:#fff;
-  --node-stroke:#000;
+    --bg:#000;
+    --fg:#fff;
+    --accent:#ff0;
+    --edge:#fff;
+    --node:#fff;
+    --node-stroke:#000;
+}
+[data-theme='protan']{
+    --bg:#000;
+    --fg:#fff;
+    --accent:#0099ff;
+    --edge:#888;
+    --node:#fff;
+    --node-stroke:#000;
+}
+[data-theme='deutan']{
+    --bg:#000;
+    --fg:#fff;
+    --accent:#ff9900;
+    --edge:#888;
+    --node:#fff;
+    --node-stroke:#000;
+}
+[data-theme='tritan']{
+    --bg:#000;
+    --fg:#fff;
+    --accent:#00ff99;
+    --edge:#888;
+    --node:#fff;
+    --node-stroke:#000;
 }
 body{
   font-family:sans-serif;
@@ -121,3 +145,25 @@ body{
 .edge.path{stroke:#964B00;}
 .node{fill:#fff;stroke:#000;stroke-width:2;cursor:pointer;}
 .node.active{fill:#ff0;}
+
+button, select, a, svg .node {
+  outline: none;
+}
+
+:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+svg .node:focus-visible {
+  stroke: var(--accent);
+  stroke-width: 4;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+.hud input[type="range"]{width:80px;margin-left:10px;}
