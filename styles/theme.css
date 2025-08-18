@@ -1,0 +1,58 @@
+:root {
+  --font-body: system-ui, sans-serif;
+  --font-display: var(--font-body);
+  --spring: 180ms;
+  --modal-fade: 120ms;
+  --bg: #111;
+  --fg: #fff;
+  --accent: #0f0;
+  --edge: #555;
+  --node: #fff;
+  --node-stroke: #000;
+}
+
+[data-theme="light"] {
+  --bg: #fff;
+  --fg: #000;
+  --accent: #060;
+  --edge: #888;
+  --node: #000;
+  --node-stroke: #fff;
+}
+
+[data-theme="high"] {
+  --bg: #000;
+  --fg: #fff;
+  --accent: #ff0;
+  --edge: #fff;
+  --node: #fff;
+  --node-stroke: #000;
+}
+
+body {
+  font-family: var(--font-body);
+  background: var(--bg);
+  color: var(--fg);
+}
+
+button,
+a,
+select {
+  transition: transform var(--spring) cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+button:hover,
+a:hover,
+select:hover {
+  transform: scale(1.05);
+}
+
+button:active,
+a:active,
+select:active {
+  transform: scale(0.95);
+}
+
+.modal {
+  transition: opacity var(--modal-fade) ease;
+}
