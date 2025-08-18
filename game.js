@@ -3,8 +3,8 @@ import Solver from './src/core/Solver.js';
 import Renderer from './src/engine/Renderer.js';
 import AudioManager from './src/engine/Audio.js';
 import { initTheme, cycleTheme } from './src/utils/Theme.js';
-import { loadRating, saveRating, updateRating, getHintDelay } from './src/progress/Rating.js';
-import Renderer from './src/engine/Renderer.js';
+import { updateRating, getHintDelay, recommendLevel } from './src/progress/Rating.js';
+import { loadProgress, saveProgress } from './src/progress/Storage.js';
 
 const i18n = await fetch('./i18n/en.json').then(r => r.json());
 const levels = await fetch('./levels/levels.json').then(r => r.json());
@@ -47,32 +47,26 @@ toggleMusicBtn.classList.toggle('off', !audio.enabled.music);
 toggleSfxBtn.classList.toggle('off', !audio.enabled.sfx);
 let currentTheme = initTheme();
 
-let levelIndex = 0;
-let hearts = 3;
-let mode = 'classic';
-let timer = 0;
+const progress = loadProgress();
+let rating = progress.rating;
+let mode = progress.mode;
+modeSelect.value = mode;
+let levelIndex = recommendLevel(rating, levels.length);
+let hearts = progress.hearts;
+let timer = progress.timer;
 let moves = 0;
+
 let timerId;
 let hintTimerId;
-let graph, renderer;
+let graph;
+let renderer;
 let solutionEdges = [];
 let currentNode = null;
 const visitedEdges = new Set();
-let rating = loadRating();
-let graph, renderer;
-let solutionEdges = [];
-const gameEl = document.getElementById('game');
-const board = document.getElementById('board');
-const heartsEl = document.getElementById('hearts');
 
-startBtn.textContent = i18n.start;
-document.querySelector('#title h1').textContent = i18n.title;
-
-let levelIndex = 0;
-let hearts = 3;
-let graph, renderer;
-let currentNode = null;
-const visitedEdges = new Set();
+function saveState() {
+  saveProgress({ hearts, timer, mode, rating });
+}
 
 function showTitle() {
   preloader.classList.add('hidden');
@@ -85,6 +79,7 @@ function startGame() {
   audio.init();
   audio.startMusic();
   mode = modeSelect.value;
+  saveState();
   loadLevel(levelIndex);
 }
 
@@ -93,12 +88,17 @@ function loadLevel(idx) {
   hearts = data.hearts || 3;
   timer = 30;
   moves = data.edges.length * 2;
+  saveState();
+
   clearInterval(timerId);
   clearTimeout(hintTimerId);
+
   if (mode === 'timed') {
+    metaEl.textContent = `⏱ ${timer}`;
     timerId = setInterval(() => {
       timer--;
       metaEl.textContent = `⏱ ${timer}`;
+      saveState();
       if (timer <= 0) gameOver();
     }, 1000);
     heartsEl.textContent = '❤'.repeat(hearts);
@@ -112,6 +112,7 @@ function loadLevel(idx) {
     heartsEl.textContent = '❤'.repeat(hearts);
     metaEl.textContent = '';
   }
+
   graph = new Graph(data.nodes, data.edges);
   renderer = new Renderer(board, graph);
   const solver = new Solver(graph);
@@ -122,11 +123,6 @@ function loadLevel(idx) {
   hintTimerId = setTimeout(() => {
     hintBtn.disabled = false;
   }, getHintDelay(rating));
-  heartsEl.textContent = '❤'.repeat(hearts);
-  graph = new Graph(data.nodes, data.edges);
-  renderer = new Renderer(board, graph);
-  currentNode = null;
-  visitedEdges.clear();
 }
 
 function showModal(text, btnText, cb) {
@@ -152,40 +148,40 @@ function handleNodeClick(e) {
   } else if (currentNode === idx) {
     target.classList.remove('active');
     currentNode = null;
-  } else {
-    if (graph.edgeExists(currentNode, idx)) {
-      const key = `${Math.min(currentNode, idx)}-${Math.max(currentNode, idx)}`;
-      if (visitedEdges.has(key)) {
-        if (mode !== 'zen') {
-          hearts--;
-          heartsEl.textContent = '❤'.repeat(hearts);
-          audio.play('fail');
-          if (hearts <= 0) return gameOver();
-        }
-      } else {
-        visitedEdges.add(key);
-        renderer.markEdge(currentNode, idx);
-        audio.play('connect');
-        currentNode = idx;
-        if (mode === 'moves') {
-          moves--;
-          metaEl.textContent = `📦 ${moves}`;
-          if (moves <= 0) return gameOver();
-        }
-        if (visitedEdges.size === graph.edges.length) return levelComplete();
-      }
-    } else {
+  } else if (graph.edgeExists(currentNode, idx)) {
+    const key = `${Math.min(currentNode, idx)}-${Math.max(currentNode, idx)}`;
+    if (visitedEdges.has(key)) {
       if (mode !== 'zen') {
         hearts--;
         heartsEl.textContent = '❤'.repeat(hearts);
+        saveState();
         audio.play('fail');
         if (hearts <= 0) return gameOver();
       }
+    } else {
+      visitedEdges.add(key);
+      renderer.markEdge(currentNode, idx);
+      audio.play('connect');
+      currentNode = idx;
       if (mode === 'moves') {
         moves--;
         metaEl.textContent = `📦 ${moves}`;
         if (moves <= 0) return gameOver();
       }
+      if (visitedEdges.size === graph.edges.length) return levelComplete();
+    }
+  } else {
+    if (mode !== 'zen') {
+      hearts--;
+      heartsEl.textContent = '❤'.repeat(hearts);
+      saveState();
+      audio.play('fail');
+      if (hearts <= 0) return gameOver();
+    }
+    if (mode === 'moves') {
+      moves--;
+      metaEl.textContent = `📦 ${moves}`;
+      if (moves <= 0) return gameOver();
     }
   }
 }
@@ -206,19 +202,6 @@ function handleHint() {
     if (!visitedEdges.has(key)) {
       renderer.highlightEdge(a, b);
       return;
-        hearts--;
-        heartsEl.textContent = '❤'.repeat(hearts);
-        if (hearts <= 0) return gameOver();
-      } else {
-        visitedEdges.add(key);
-        renderer.markEdge(currentNode, idx);
-        currentNode = idx;
-        if (visitedEdges.size === graph.edges.length) return levelComplete();
-      }
-    } else {
-      hearts--;
-      heartsEl.textContent = '❤'.repeat(hearts);
-      if (hearts <= 0) return gameOver();
     }
   }
 }
@@ -227,7 +210,7 @@ function levelComplete() {
   clearInterval(timerId);
   audio.play('complete');
   rating = updateRating(rating, true);
-  saveRating(rating);
+  saveState();
   showModal(i18n.levelComplete, i18n.next, () => {
     levelIndex = (levelIndex + 1) % levels.length;
     loadLevel(levelIndex);
@@ -238,7 +221,7 @@ function gameOver() {
   clearInterval(timerId);
   audio.play('fail');
   rating = updateRating(rating, false);
-  saveRating(rating);
+  saveState();
   showModal(i18n.gameOver, i18n.retry, () => {
     levelIndex = 0;
     loadLevel(levelIndex);
@@ -260,18 +243,5 @@ hintBtn.addEventListener('click', handleHint);
 toggleThemeBtn.addEventListener('click', () => {
   currentTheme = cycleTheme(currentTheme);
 });
-  alert(i18n.levelComplete);
-  levelIndex = (levelIndex + 1) % levels.length;
-  loadLevel(levelIndex);
-}
-
-function gameOver() {
-  alert(i18n.gameOver);
-  levelIndex = 0;
-  loadLevel(levelIndex);
-}
-
-board.addEventListener('click', handleNodeClick);
-startBtn.addEventListener('click', startGame);
 
 setTimeout(showTitle, 700);
