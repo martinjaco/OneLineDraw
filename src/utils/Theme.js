@@ -1,3 +1,4 @@
+const THEMES = ['dark','light','high','protan','deutan','tritan'];
 import { getTheme, setTheme } from '../progress/Storage.ts';
 
 const THEMES = ['dark','light','high'];

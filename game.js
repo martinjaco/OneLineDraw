@@ -4,6 +4,9 @@ import Renderer from './src/engine/Renderer.js';
 import AudioManager from './src/engine/Audio.js';
 import { initTheme, cycleTheme } from './src/utils/Theme.js';
 import { loadRating, saveRating, updateRating, getHintDelay } from './src/progress/Rating.js';
+import { announce, showModal as trapShowModal, hideModal as trapHideModal } from './src/ui/UI.js';
+
+const i18n = await fetch('./i18n/en.json').then(r => r.json());
 import * as Storage from './src/progress/Storage.ts';
 const locale = Storage.getLocale();
 Storage.setLocale(locale);
@@ -74,7 +77,13 @@ let graph, renderer;
 let solutionEdges = [];
 let currentNode = null;
 const visitedEdges = new Set();
+const edgeHistory = [];
+let nodeElems = [];
+let paused = false;
 let rating = loadRating();
+
+startBtn.textContent = i18n.start;
+document.querySelector('#title h1').textContent = i18n.title;
 let dailyDate = null;
 
 function showTitle() {
@@ -140,6 +149,9 @@ function loadLevel(idx) {
   solutionEdges = solver.solve();
   currentNode = null;
   visitedEdges.clear();
+  edgeHistory.length = 0;
+  nodeElems = Array.from(board.querySelectorAll('.node'));
+  if (nodeElems[0]) nodeElems[0].focus();
   hintBtn.disabled = true;
   hintTimerId = setTimeout(() => {
     hintBtn.disabled = false;
@@ -150,16 +162,16 @@ function loadLevel(idx) {
 function showModal(text, btnText, cb) {
   modalText.textContent = text;
   modalBtn.textContent = btnText;
+  trapShowModal(modal);
   modal.classList.remove('hidden');
   audio.duck(true);
   const handler = () => {
-    modal.classList.add('hidden');
+    trapHideModal(modal);
     modalBtn.removeEventListener('click', handler);
     audio.duck(false);
     cb();
   };
   modalBtn.addEventListener('click', handler, { once: true });
-  modalBtn.focus();
 }
 
 function handleNodeClick(e) {
@@ -176,12 +188,15 @@ function handleNodeClick(e) {
           hearts--;
           heartsEl.textContent = '❤'.repeat(hearts);
           audio.play('fail');
+          announce('Edge already used');
           if (hearts <= 0) return gameOver();
         }
       } else {
         visitedEdges.add(key);
+        edgeHistory.push({ a: currentNode, b: idx });
         renderer.markEdge(currentNode, idx);
         audio.play('connect');
+        announce(`Connected ${currentNode} to ${idx}`);
         currentNode = idx;
         if (mode === 'moves') {
           moves--;
@@ -195,6 +210,7 @@ function handleNodeClick(e) {
         hearts--;
         heartsEl.textContent = '❤'.repeat(hearts);
         audio.play('fail');
+        announce('Invalid move');
         if (hearts <= 0) return gameOver();
       }
       if (mode === 'moves') {
@@ -207,12 +223,58 @@ function handleNodeClick(e) {
 }
 
 function handleKey(e) {
-  if (e.target.classList.contains('node') && (e.key === 'Enter' || e.key === ' ')) {
-    handleNodeClick(e);
+  const key = e.key;
+  if (key === 'ArrowRight' || key === 'ArrowDown') {
+    moveFocus(1);
     e.preventDefault();
-  }
-  if (e.key.toLowerCase() === 'h') {
+  } else if (key === 'ArrowLeft' || key === 'ArrowUp') {
+    moveFocus(-1);
+    e.preventDefault();
+  } else if (key === 'Enter' || key === ' ') {
+    if (e.target.classList.contains('node')) handleNodeClick(e);
+    e.preventDefault();
+  } else if (key.toLowerCase() === 'u') {
+    undo();
+  } else if (key.toLowerCase() === 'p') {
+    togglePause();
+  } else if (key.toLowerCase() === 'h') {
     handleHint();
+  }
+}
+
+function moveFocus(dir) {
+  if (!nodeElems.length) return;
+  const current = nodeElems.indexOf(document.activeElement);
+  let next = current + dir;
+  if (next < 0) next = nodeElems.length - 1;
+  if (next >= nodeElems.length) next = 0;
+  nodeElems[next].focus();
+}
+
+function undo() {
+  const last = edgeHistory.pop();
+  if (!last) return;
+  const key = `${Math.min(last.a, last.b)}-${Math.max(last.a, last.b)}`;
+  visitedEdges.delete(key);
+  renderer.unmarkEdge(last.a, last.b);
+  currentNode = last.a;
+  announce('Undid move');
+}
+
+function togglePause() {
+  if (paused) {
+    trapHideModal(modal);
+    paused = false;
+  } else {
+    modalText.textContent = i18n.paused || 'Paused';
+    modalBtn.textContent = i18n.resume || 'Resume';
+    trapShowModal(modal);
+    modalBtn.onclick = () => {
+      trapHideModal(modal);
+      modalBtn.onclick = null;
+      paused = false;
+    };
+    paused = true;
   }
 }
 
@@ -289,5 +351,4 @@ hintBtn.addEventListener('click', handleHint);
 toggleThemeBtn.addEventListener('click', () => {
   currentTheme = cycleTheme(currentTheme);
 });
-
 setTimeout(showTitle, 700);
