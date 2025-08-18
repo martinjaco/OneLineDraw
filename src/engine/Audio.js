@@ -1,9 +1,11 @@
+import { getAudio, setAudio } from '../progress/Storage.ts';
+
 export default class AudioManager {
   constructor() {
     this.ctx = null;
     this.musicOsc = null;
     this.musicGain = null;
-    const saved = JSON.parse(localStorage.getItem('audio') || '{}');
+    const saved = getAudio();
     this.enabled = {
       music: saved.music !== undefined ? saved.music : true,
       sfx: saved.sfx !== undefined ? saved.sfx : true,
@@ -20,7 +22,7 @@ export default class AudioManager {
   }
 
   save() {
-    localStorage.setItem('audio', JSON.stringify(this.enabled));
+    setAudio(this.enabled);
   }
 
   toggle(type) {

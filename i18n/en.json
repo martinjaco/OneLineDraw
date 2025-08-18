@@ -9,6 +9,7 @@
   "sfx": "SFX",
   "editor": "Editor",
   "hint": "Hint",
-  "theme": "Theme"
-  "retry": "Retry"
+  "theme": "Theme",
+  "dailyComplete": "Daily Complete",
+  "daily": "Daily"
 }

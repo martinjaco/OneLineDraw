@@ -4,9 +4,10 @@ import Renderer from './src/engine/Renderer.js';
 import AudioManager from './src/engine/Audio.js';
 import { initTheme, cycleTheme } from './src/utils/Theme.js';
 import { loadRating, saveRating, updateRating, getHintDelay } from './src/progress/Rating.js';
-import Renderer from './src/engine/Renderer.js';
-
-const i18n = await fetch('./i18n/en.json').then(r => r.json());
+import * as Storage from './src/progress/Storage.ts';
+const locale = Storage.getLocale();
+Storage.setLocale(locale);
+const i18n = await fetch(`./i18n/${locale}.json`).then(r => r.json());
 const levels = await fetch('./levels/levels.json').then(r => r.json());
 
 const preloader = document.getElementById('preloader');
@@ -45,11 +46,14 @@ hintBtn.title = i18n.hint;
 hintBtn.setAttribute('aria-label', i18n.hint);
 toggleMusicBtn.classList.toggle('off', !audio.enabled.music);
 toggleSfxBtn.classList.toggle('off', !audio.enabled.sfx);
+
+modeSelect.value = Storage.getMode();
 let currentTheme = initTheme();
 
-let levelIndex = 0;
+let levelIndex = Storage.getCurrentLevel();
 let hearts = 3;
-let mode = 'classic';
+let initialHearts = 3;
+let mode = Storage.getMode();
 let timer = 0;
 let moves = 0;
 let timerId;
@@ -59,24 +63,20 @@ let solutionEdges = [];
 let currentNode = null;
 const visitedEdges = new Set();
 let rating = loadRating();
-let graph, renderer;
-let solutionEdges = [];
-const gameEl = document.getElementById('game');
-const board = document.getElementById('board');
-const heartsEl = document.getElementById('hearts');
-
-startBtn.textContent = i18n.start;
-document.querySelector('#title h1').textContent = i18n.title;
-
-let levelIndex = 0;
-let hearts = 3;
-let graph, renderer;
-let currentNode = null;
-const visitedEdges = new Set();
+let dailyDate = null;
 
 function showTitle() {
   preloader.classList.add('hidden');
   title.classList.remove('hidden');
+}
+
+function getDailyChallenge() {
+  const date = new Date().toISOString().slice(0,10);
+  let hash = 0;
+  for (const c of date) {
+    hash = (hash * 31 + c.charCodeAt(0)) % levels.length;
+  }
+  return { index: hash, date };
 }
 
 function startGame() {
@@ -85,17 +85,27 @@ function startGame() {
   audio.init();
   audio.startMusic();
   mode = modeSelect.value;
+  Storage.setMode(mode);
+  if (mode === 'daily') {
+    const daily = getDailyChallenge();
+    levelIndex = daily.index;
+    dailyDate = daily.date;
+  } else {
+    levelIndex = Storage.getCurrentLevel();
+    dailyDate = null;
+  }
   loadLevel(levelIndex);
 }
 
 function loadLevel(idx) {
   const data = levels[idx];
-  hearts = data.hearts || 3;
+  initialHearts = data.hearts || 3;
+  hearts = initialHearts;
   timer = 30;
   moves = data.edges.length * 2;
   clearInterval(timerId);
   clearTimeout(hintTimerId);
-  if (mode === 'timed') {
+  if (mode === 'timed' || mode === 'daily') {
     timerId = setInterval(() => {
       timer--;
       metaEl.textContent = `⏱ ${timer}`;
@@ -122,11 +132,7 @@ function loadLevel(idx) {
   hintTimerId = setTimeout(() => {
     hintBtn.disabled = false;
   }, getHintDelay(rating));
-  heartsEl.textContent = '❤'.repeat(hearts);
-  graph = new Graph(data.nodes, data.edges);
-  renderer = new Renderer(board, graph);
-  currentNode = null;
-  visitedEdges.clear();
+  if (mode !== 'daily') Storage.setCurrentLevel(idx);
 }
 
 function showModal(text, btnText, cb) {
@@ -148,10 +154,6 @@ function handleNodeClick(e) {
   const idx = parseInt(target.getAttribute('data-index'), 10);
   if (currentNode === null) {
     currentNode = idx;
-    target.classList.add('active');
-  } else if (currentNode === idx) {
-    target.classList.remove('active');
-    currentNode = null;
   } else {
     if (graph.edgeExists(currentNode, idx)) {
       const key = `${Math.min(currentNode, idx)}-${Math.max(currentNode, idx)}`;
@@ -206,19 +208,6 @@ function handleHint() {
     if (!visitedEdges.has(key)) {
       renderer.highlightEdge(a, b);
       return;
-        hearts--;
-        heartsEl.textContent = '❤'.repeat(hearts);
-        if (hearts <= 0) return gameOver();
-      } else {
-        visitedEdges.add(key);
-        renderer.markEdge(currentNode, idx);
-        currentNode = idx;
-        if (visitedEdges.size === graph.edges.length) return levelComplete();
-      }
-    } else {
-      hearts--;
-      heartsEl.textContent = '❤'.repeat(hearts);
-      if (hearts <= 0) return gameOver();
     }
   }
 }
@@ -226,21 +215,38 @@ function handleHint() {
 function levelComplete() {
   clearInterval(timerId);
   audio.play('complete');
-  rating = updateRating(rating, true);
-  saveRating(rating);
-  showModal(i18n.levelComplete, i18n.next, () => {
-    levelIndex = (levelIndex + 1) % levels.length;
-    loadLevel(levelIndex);
-  });
+  if (mode === 'daily') {
+    Storage.updateDaily(dailyDate, {
+      solved: true,
+      perfect: hearts === initialHearts,
+      gold: timer >= 20
+    });
+    showModal(i18n.dailyComplete || i18n.levelComplete, i18n.retry, () => {
+      loadLevel(levelIndex);
+    });
+  } else {
+    rating = updateRating(rating, true);
+    saveRating(rating);
+    Storage.updateBestStats(levelIndex, { hearts, time: timer });
+    Storage.unlockLevel((levelIndex + 1) % levels.length);
+    showModal(i18n.levelComplete, i18n.next, () => {
+      levelIndex = (levelIndex + 1) % levels.length;
+      Storage.setCurrentLevel(levelIndex);
+      loadLevel(levelIndex);
+    });
+  }
 }
 
 function gameOver() {
   clearInterval(timerId);
   audio.play('fail');
-  rating = updateRating(rating, false);
-  saveRating(rating);
-  showModal(i18n.gameOver, i18n.retry, () => {
+  if (mode !== 'daily') {
+    rating = updateRating(rating, false);
+    saveRating(rating);
     levelIndex = 0;
+    Storage.setCurrentLevel(levelIndex);
+  }
+  showModal(i18n.gameOver, i18n.retry, () => {
     loadLevel(levelIndex);
   });
 }
@@ -248,6 +254,9 @@ function gameOver() {
 board.addEventListener('click', handleNodeClick);
 board.addEventListener('keydown', handleKey);
 startBtn.addEventListener('click', startGame);
+modeSelect.addEventListener('change', () => {
+  Storage.setMode(modeSelect.value);
+});
 toggleMusicBtn.addEventListener('click', () => {
   const on = audio.toggle('music');
   toggleMusicBtn.classList.toggle('off', !on);
@@ -260,18 +269,5 @@ hintBtn.addEventListener('click', handleHint);
 toggleThemeBtn.addEventListener('click', () => {
   currentTheme = cycleTheme(currentTheme);
 });
-  alert(i18n.levelComplete);
-  levelIndex = (levelIndex + 1) % levels.length;
-  loadLevel(levelIndex);
-}
-
-function gameOver() {
-  alert(i18n.gameOver);
-  levelIndex = 0;
-  loadLevel(levelIndex);
-}
-
-board.addEventListener('click', handleNodeClick);
-startBtn.addEventListener('click', startGame);
 
 setTimeout(showTitle, 700);
