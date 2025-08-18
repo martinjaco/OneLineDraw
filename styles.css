@@ -166,3 +166,4 @@ svg .node:focus-visible {
     transition: none !important;
   }
 }
+.hud input[type="range"]{width:80px;margin-left:10px;}

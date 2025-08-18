@@ -20,6 +20,7 @@
       <option value="classic">Classic</option>
       <option value="timed">Timed</option>
       <option value="moves">Moves</option>
+      <option value="daily">Daily</option>
       <option value="zen">Zen</option>
     </select>
     <button id="startBtn"></button>
@@ -33,6 +34,10 @@
       <button id="toggleMusic" aria-label="Toggle Music"></button>
       <button id="toggleSfx" aria-label="Toggle SFX"></button>
       <button id="toggleTheme" aria-label="Toggle Theme"></button>
+      <label for="musicSlider" class="visually-hidden">Music Volume</label>
+      <input id="musicSlider" type="range" min="0" max="1" step="0.01">
+      <label for="sfxSlider" class="visually-hidden">SFX Volume</label>
+      <input id="sfxSlider" type="range" min="0" max="1" step="0.01">
       <button id="hintBtn" aria-label="Hint"></button>
     </div>
     <svg id="board" tabindex="0"></svg>
