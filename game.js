@@ -16,6 +16,7 @@ Storage.setLocale(locale);
 const i18n = await fetch(`./i18n/${locale}.json`).then(r => r.json());
 const levels = await fetch('./levels/levels.json').then(r => r.json());
 
+const progressEl = document.getElementById('progress');
 const preloader = document.getElementById('preloader');
 const title = document.getElementById('title');
 const startBtn = document.getElementById('startBtn');
@@ -34,6 +35,19 @@ const sfxSlider = document.getElementById('sfxSlider');
 const modal = document.getElementById('modal');
 const modalText = document.getElementById('modalText');
 const modalBtn = document.getElementById('modalBtn');
+
+const resources = [
+  fetch('./i18n/en.json').then(r => r.json()),
+  fetch('./levels/levels.json').then(r => r.json())
+];
+let loaded = 0;
+function updateProgress() {
+  progressEl.style.width = `${(loaded / resources.length) * 100}%`;
+}
+updateProgress();
+const [i18n, levels] = await Promise.all(
+  resources.map(p => p.then(res => { loaded++; updateProgress(); return res; }))
+);
 
 const audio = new AudioManager();
 const particles = new Particles(gameEl);
@@ -151,6 +165,7 @@ let dailyDate = null;
 function showTitle() {
   preloader.classList.add('hidden');
   title.classList.remove('hidden');
+  requestAnimationFrame(() => title.classList.add('show'));
 }
 
 function getDailyChallenge() {
@@ -486,4 +501,6 @@ hintBtn.addEventListener('click', handleHint);
 toggleThemeBtn.addEventListener('click', () => {
   currentTheme = cycleTheme(currentTheme);
 });
+
+setTimeout(showTitle, 600);
 setTimeout(showTitle, 700);

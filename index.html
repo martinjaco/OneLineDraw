@@ -5,7 +5,13 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0">
   <title>One Line Draw</title>
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles/theme.css">
 </head>
+<body>
+  <div id="preloader" class="preloader">
+    <img src="assets/logo.svg" alt="One Line Draw" class="logo">
+    <div class="bar"><div id="progress" class="progress"></div></div>
+  </div>
   <body>
     <div id="announcer" class="visually-hidden" aria-live="assertive"></div>
     <div id="preloader" class="preloader">
@@ -14,8 +20,19 @@
     </div>
 
   <div id="title" class="title hidden">
-    <h1>One Line Draw</h1>
+    <img src="assets/logo.svg" alt="One Line Draw" class="logo">
+    <h1 class="visually-hidden">One Line Draw</h1>
     <label for="modeSelect" class="visually-hidden">Mode</label>
+    <div class="controls">
+      <select id="modeSelect">
+        <option value="classic">Classic</option>
+        <option value="timed">Timed</option>
+        <option value="moves">Moves</option>
+        <option value="zen">Zen</option>
+      </select>
+      <button id="startBtn"></button>
+      <a id="editorLink" href="editor.html">Editor</a>
+    </div>
     <select id="modeSelect">
       <option value="classic">Classic</option>
       <option value="timed">Timed</option>
@@ -47,12 +64,6 @@
         <button id="modalBtn"></button>
       </div>
     </div>
-    <button id="startBtn"></button>
-  </div>
-
-  <div id="game" class="game hidden">
-    <div class="hud"><span id="hearts"></span></div>
-    <svg id="board" tabindex="0"></svg>
   </div>
 
   <script type="module" src="game.js"></script>
